@@ -1,0 +1,30 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ML / experiment artifacts (not committed; loaded by name or volume).
+# Anchored to repo root so they never match the app/models package.
+/mlruns/
+/models/
+*.ckpt
+*.safetensors
+
+# OS
+.DS_Store
+Thumbs.db

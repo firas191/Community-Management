@@ -1,0 +1,74 @@
+[project]
+name = "community-management"
+version = "0.1.0"
+description = "Intelligent Community Management Analytics Engine"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+
+# Core runtime dependencies for Week 1 (data layer + ingestion + API).
+# Heavier ML/LLM deps (transformers, bertopic, litellm, langgraph) arrive in
+# their own roadmap weeks to keep the Week 1 image small and buildable.
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "pydantic==2.10.4",
+    "pydantic-settings==2.7.1",
+    "sqlalchemy==2.0.36",
+    "alembic==1.14.0",
+    "psycopg[binary]==3.2.3",
+    "pgvector==0.3.6",
+    "redis==5.2.1",
+    "celery==5.4.0",
+    "pandas==2.2.3",
+    "numpy==2.2.1",
+    "python-multipart==0.0.20",
+    "structlog==24.4.0",
+    "python-dateutil==2.9.0.post0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.25.0",
+    "pytest-cov==6.0.0",
+    "httpx==0.28.1",
+    "ruff==0.8.6",
+    "mypy==1.14.1",
+    "fakeredis==2.26.2",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*", "config*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# E,F pycodestyle/pyflakes; I isort; B bugbear; UP pyupgrade; N naming.
+select = ["E", "F", "I", "B", "UP", "N", "W"]
+ignore = ["E501"]  # line length handled by formatter, not linter
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "config"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "-ra"
+# Coverage target per brief Section 13: >80% on analytics/ and nlp/.
+# Enable with: pytest --cov=app/analytics --cov=app/nlp --cov-report=term-missing
+
+[tool.mypy]
+python_version = "3.11"
+# Loose per brief Section 5: signal, not a gate.
+ignore_missing_imports = true
+warn_unused_ignores = false
+check_untyped_defs = true
