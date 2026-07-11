@@ -1,5 +1,8 @@
 # Community Management
 
+<!-- Replace OWNER with your GitHub username or org once the repo is pushed. -->
+[![CI](https://github.com/OWNER/community-management/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/community-management/actions/workflows/ci.yml)
+
 Intelligent Community Management Analytics Engine. The intelligence layer of a
 social media community management application. Multilingual sentiment (French,
 English, Arabic, Tunisian Arabizi), KPI and recommendation engines, a free-tier
