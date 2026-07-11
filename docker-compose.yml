@@ -33,8 +33,14 @@ services:
       retries: 10
 
   api:
+    # Built once and shared by worker and beat (identical image), so the image is
+    # exported and stored a single time, not three times.
     build: .
+    image: community_management:app
     env_file: .env
+    # Model weights download here on first use and persist across restarts.
+    volumes:
+      - hfcache:/models/hf
     ports:
       - "8000:8000"
     depends_on:
@@ -47,11 +53,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   worker:
-    build: .
+    image: community_management:app
     env_file: .env
+    volumes:
+      - hfcache:/models/hf
     depends_on:
       db:
         condition: service_healthy
@@ -60,7 +68,7 @@ services:
     command: celery -A app.workers.celery_app.celery_app worker --loglevel=INFO
 
   beat:
-    build: .
+    image: community_management:app
     env_file: .env
     depends_on:
       db:
@@ -71,3 +79,4 @@ services:
 
 volumes:
   pgdata:
+  hfcache:

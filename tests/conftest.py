@@ -118,3 +118,26 @@ def db_session(_engine):
         session.close()
         _assert_safe_to_wipe(str(_engine.url))
         Base.metadata.drop_all(_engine)
+
+
+@pytest.fixture()
+def api_get_db(_engine):
+    """A `get_db` override that gives each request its OWN session, bound to the
+    test database, exactly like production.
+
+    Data committed by one request is visible to the next; uncommitted work is not.
+    A single shared session (the naive override) would hide a service that forgets
+    to commit, because reads in a later request would see the earlier request's
+    still-open, uncommitted changes. This override makes API tests catch that class
+    of bug: cross-request visibility depends on a real commit.
+    """
+    factory = sessionmaker(bind=_engine, expire_on_commit=False)
+
+    def _dep():
+        session = factory()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    return _dep

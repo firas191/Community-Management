@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app import __version__
 from app.core.cache import ping as redis_ping
 from app.core.db import get_db
+from app.nlp.sentiment import SENTIMENT_MODEL_VERSION
 from app.schemas.health import DependencyStatus, HealthResponse, LivenessResponse
 from config.constants import (
     EMBEDDING_MODEL,
@@ -48,7 +49,7 @@ async def health(db: Session = Depends(get_db)) -> HealthResponse:
 async def models() -> dict:
     # Registry of models the system will load. Versions filled in as weeks land.
     return {
-        "sentiment_multilingual": {"name": SENTIMENT_MODEL_MULTILINGUAL, "version": "pending"},
+        "sentiment_multilingual": {"name": SENTIMENT_MODEL_MULTILINGUAL, "version": SENTIMENT_MODEL_VERSION},
         "embedding": {"name": EMBEDDING_MODEL, "version": "pending"},
         "arabizi_finetuned": {"name": "community-management-arabizi", "version": "not_trained"},
     }

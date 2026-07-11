@@ -116,8 +116,67 @@ the query parameters. The cache is a pure optimization. If Redis is unreachable
 the endpoint logs a warning, computes the answer, and serves it. No number ever
 depends on the cache being up.
 
-## 2. Sentiment models (Week 3+)
+## 2. Sentiment pipeline (Week 3)
 
-Reserved. The multilingual baseline and the fine-tuned Tunisian Arabizi model,
-their training protocol, and the per-language evaluation tables are documented
-here when that work lands.
+The pipeline turns a raw comment into a traceable sentiment label across four
+registers: French, English, Modern Standard Arabic, and Tunisian Arabizi.
+
+```
+comment -> preprocess -> detect language -> classify (Model A) -> store label
+```
+
+### 2.1 Preprocessing
+
+Deterministic and pure (`nlp/preprocessing.py`). @mentions become `@user` and
+URLs become `http` (the cardiffnlp training convention, which improves accuracy).
+Character floods are collapsed keeping one repeat as an intensity signal
+(`barchaaaa -> barchaa`). Arabic letters are normalized (alef/hamza variants
+unified, diacritics and tatweel dropped, `ة -> ه`, `ى -> ي`). Emojis are
+preserved for the model and also scored on a curated polarity lexicon for the
+emoji-analytics feature. An Arabizi digit-to-Arabic map (`3 -> ع`, `7 -> ح`,
+`9 -> ق`, `5 -> خ`) is documented and exported for the Week 4 fine-tuned model.
+
+### 2.2 Language routing (the differentiator)
+
+The valuable, hard case is Tunisian Arabizi: dialect in Latin letters and digits
+("3ajbetni barcha", "ya3tik sa7a"). Generic detectors mislabel it. The router
+(`nlp/language.py`) is deterministic on top of a pluggable base detector:
+
+1. Mostly Arabic script -> `ar`.
+2. Latin script AND an Arabizi signal -> `aeb-latn`. The signal is (a) digits
+   used as letters intra-word (a Latin letter adjacent to 2/3/5/6/7/8/9) or
+   (b) a curated Tunisian lexicon hit ("barcha", "behi", "yesser", "sa7a",
+   "3aslema", ...). A pure number like "300" does not trigger it.
+3. Otherwise the base detector (langdetect, or a heuristic offline) returns
+   `fr` / `en`, else `other`.
+
+Each result carries a confidence and the method used (`script`, `arabizi_rule`,
+`base_detector`, `heuristic`). fastText lid.176 can replace the base detector
+behind one function without touching the rule layer. On the seeded multilingual
+set the router labels all four registers correctly (9/9).
+
+### 2.3 Sentiment model (Model A)
+
+`cardiffnlp/twitter-xlm-roberta-base-sentiment`: XLM-RoBERTa fine-tuned for
+three-class sentiment (positive / neutral / negative) across the project's
+languages. The model sits behind a `SentimentBackend` Protocol and is
+lazy-loaded on first use, so the app boots and the whole pipeline is unit-tested
+without downloading weights (a stub backend is injected in tests). fr / en / ar
+and unknown route to Model A. Arabizi also uses Model A for now, flagged
+`needs_arabizi_specialist`; the fine-tuned Arabizi model (Model B) replaces that
+path in Week 4 without changing the interface. Every stored label records
+`model_name` and `model_version` for reproducibility.
+
+### 2.4 Aggregation
+
+Sentiment maps to a net score for rollups: positive = +1, neutral = 0,
+negative = -1; the window mean lands in [-1, 1]. The summary reports the
+distribution, a per-language breakdown, a daily net-sentiment trend, and deltas
+versus the previous window. Negative alerting flags a day whose negative share
+exceeds mean + 2 sigma with at least 10 comments (brief Section 11.5).
+
+## 3. Fine-tuned Arabizi model (Week 4)
+
+Reserved. The TUNIZI fine-tuning protocol and per-language evaluation tables
+(macro-F1 for fr/en/ar/aeb-latn, before and after) are documented here when that
+work lands.

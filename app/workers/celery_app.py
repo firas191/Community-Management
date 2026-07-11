@@ -20,6 +20,7 @@ celery_app = Celery(
     "community_management",
     broker=settings.redis_url,
     backend=settings.redis_url,
+    include=["app.workers.tasks_analyze"],
 )
 celery_app.conf.update(
     task_serializer="json",
@@ -35,6 +36,11 @@ celery_app.conf.beat_schedule = {
     "heartbeat-every-5-min": {
         "task": "app.workers.celery_app.heartbeat",
         "schedule": 300.0,
+    },
+    # Sentiment analysis of newly ingested comments (brief Section 7.2).
+    "analyze-new-comments-every-30-min": {
+        "task": "app.workers.tasks_analyze.analyze_new_comments_task",
+        "schedule": 1800.0,
     },
 }
 

@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import routes_health, routes_ingestion, routes_kpi
+from app.api import routes_health, routes_ingestion, routes_kpi, routes_sentiment
 from app.config import settings
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging, get_logger
@@ -40,6 +40,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_health.router)
     app.include_router(routes_ingestion.router)
     app.include_router(routes_kpi.router)
+    app.include_router(routes_sentiment.router)
 
     log.info("app_started", version=__version__, cors_origins=settings.cors_origin_list)
     return app

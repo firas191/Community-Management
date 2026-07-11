@@ -19,10 +19,11 @@ HEADERS = {"X-API-Key": "change-me"}
 
 
 @pytest.fixture()
-def client(db_session):
+def client(db_session, api_get_db):
     synthetic.seed(db_session)
     db_session.commit()
-    app.dependency_overrides[get_db] = lambda: db_session
+    # Each request gets its own session, bound to the test DB, like production.
+    app.dependency_overrides[get_db] = api_get_db
     yield TestClient(app)
     app.dependency_overrides.clear()
 

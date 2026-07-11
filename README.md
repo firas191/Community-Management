@@ -33,6 +33,17 @@ curl -H "X-API-Key: change-me" \
   "localhost:8000/kpi/overview?account_id=1&window=90d"
 ```
 
+Week 3 delivered: the multilingual sentiment pipeline (the differentiator).
+Social-text preprocessing, language routing with a Tunisian Arabizi rule layer
+(French, English, Arabic, and Arabizi), the multilingual sentiment model behind
+an injectable backend, a batch analysis service with a scheduled Celery job, and
+the `/sentiment/*` API. The Docker image bundles the sentiment stack (CPU torch +
+transformers); the model weights download on the first `/sentiment` request and
+persist in a volume, so it works after `docker compose up --build` (the first
+call warms the model). For a local run outside Docker, install the model with
+`pip install -e ".[nlp]"`. Formulas and routing rules are in
+`docs/models_and_algorithms.md`.
+
 ## Quick start
 
 ```bash

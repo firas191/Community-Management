@@ -25,6 +25,9 @@ dependencies = [
     "python-multipart==0.0.20",
     "structlog==24.4.0",
     "python-dateutil==2.9.0.post0",
+    # Light, pure-Python language detection. The heavy sentiment transformer is
+    # in the `nlp` extra; language routing works without it.
+    "langdetect==1.0.9",
 ]
 
 [project.optional-dependencies]
@@ -36,6 +39,16 @@ dev = [
     "ruff==0.8.6",
     "mypy==1.14.1",
     "fakeredis==2.26.2",
+]
+
+# Week 3 sentiment model (Model A). Heavy (~2 GB with torch); installed only where
+# real inference runs. The app and tests work without it via the injectable backend.
+nlp = [
+    "transformers==4.48.0",
+    "torch==2.5.1",
+    # XLM-RoBERTa uses a SentencePiece tokenizer; transformers needs these to load it.
+    "sentencepiece==0.2.0",
+    "protobuf==4.25.5",
 ]
 
 [build-system]

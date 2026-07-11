@@ -192,3 +192,47 @@ Posts ranked by the chosen metric, each with a full 10-KPI breakdown.
 
 Errors: unknown `account_id` returns 404, a bad `window` or `metric` returns 400,
 a malformed `from`/`to` returns 422, all as `application/problem+json`.
+
+## Sentiment
+
+Multilingual sentiment across French, English, Arabic, and Tunisian Arabizi.
+The Docker image bundles the sentiment stack; the model weights download on the
+first request and are cached in a volume (so the first call is slower). Outside
+Docker, install the model with `pip install -e ".[nlp]"`. Until the model is
+present, endpoints that need it return 503 with an actionable message (language
+detection still works without it).
+
+`POST /sentiment/analyze`
+
+Body `{"texts": ["...", "..."]}` (1 to 200 items). Returns per-text language,
+sentiment, confidence, and model traceability.
+
+```json
+{
+  "results": [
+    {"text": "3ajbetni barcha", "language": "aeb-latn", "language_confidence": 0.87,
+     "language_method": "arabizi_rule", "sentiment": "positive", "score": 0.95,
+     "model_name": "cardiffnlp/twitter-xlm-roberta-base-sentiment",
+     "model_version": "xlmr-base-multilingual-1.0",
+     "needs_arabizi_specialist": true, "emoji_polarity": 0.0}
+  ]
+}
+```
+
+`POST /sentiment/run`
+
+Query `account_id?` and `limit` (1 to 5000). Analyzes stored comments that have
+no label yet and writes results to `comment_analyses`. Idempotent: a second run
+finds nothing new. Returns `{"analyzed": N, "skipped": 0}`.
+
+`GET /sentiment/summary`
+
+Query `account_id` (required) and `window` (default `30d`). Distribution and
+percentages, net sentiment in [-1, 1], a per-language breakdown, a daily trend,
+and deltas versus the previous window.
+
+`GET /sentiment/negative-alerts`
+
+Query `account_id` (required), `window` (default `14d`), `limit`. Recent negative
+comments plus per-day negative share, with days flagged where the share exceeds
+mean + 2 sigma over at least 10 comments.
