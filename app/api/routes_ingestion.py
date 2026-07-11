@@ -59,7 +59,7 @@ async def import_csv(
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"as_of must be ISO 8601, got '{as_of}'.",
-            )
+            ) from None
     try:
         result = import_csv_bytes(
             db,
@@ -73,7 +73,7 @@ async def import_csv(
         db.commit()
     except CSVImportError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except Exception:
         db.rollback()
         raise

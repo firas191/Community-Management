@@ -91,11 +91,10 @@ def db_session(_engine):
     Creates the extension + tables + platform seed, yields a session, then rolls
     the schema back by dropping it. Kept simple over speed: the suite is small.
     """
-    from app.core.db import Base
-    from config.constants import PLATFORMS
-
     # Import models so metadata is populated.
     import app.models  # noqa: F401
+    from app.core.db import Base
+    from config.constants import PLATFORMS
 
     # Belt and suspenders: re-check the target right before any destructive op.
     _assert_safe_to_wipe(str(_engine.url))
@@ -105,8 +104,8 @@ def db_session(_engine):
     Base.metadata.drop_all(_engine)
     Base.metadata.create_all(_engine)
 
-    Session = sessionmaker(bind=_engine, expire_on_commit=False)
-    session = Session()
+    session_factory = sessionmaker(bind=_engine, expire_on_commit=False)
+    session = session_factory()
     # Seed platform lookup rows.
     from app.models import Platform
 

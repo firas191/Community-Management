@@ -15,10 +15,10 @@ from app.ingestion.csv_importer import import_csv_bytes
 from app.models import Comment, Post, PostMetricSnapshot
 
 CSV = (
-    "Post ID,Page ID,Page name,Publish time,Post type,Title,Reach,Reactions,Comments,Shares\n"
-    "100,page_9,Demo,2026-07-03 19:30:00,Photo,Hello #promo,1000,80,10,4\n"
-    "101,page_9,Demo,2026-07-04 08:00:00,Reels,Second #food,500,40,5,2\n"
-).encode("utf-8")
+    b"Post ID,Page ID,Page name,Publish time,Post type,Title,Reach,Reactions,Comments,Shares\n"
+    b"100,page_9,Demo,2026-07-03 19:30:00,Photo,Hello #promo,1000,80,10,4\n"
+    b"101,page_9,Demo,2026-07-04 08:00:00,Reels,Second #food,500,40,5,2\n"
+)
 
 
 def _count(db, model) -> int:

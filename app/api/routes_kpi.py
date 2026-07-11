@@ -78,7 +78,7 @@ def _parse_dt(value: str | None, field: str) -> datetime | None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"{field} must be ISO 8601, got '{value}'.",
-        )
+        ) from None
 
 
 @router.get("/overview", response_model=KPIOverviewResponse)
