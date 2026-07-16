@@ -4,9 +4,9 @@
   GET  /ingestion/status   row counts per table + sync cursors
   POST /ingestion/run      trigger a live connector sync
 
-Live connectors (Meta, YouTube) land in Week 3. Until then /ingestion/run
-returns 501 with a clear reason rather than pretending to work. The CSV path is
-fully functional now and needs no credentials.
+Live connectors (Meta Graph API, YouTube Data API) run via /ingestion/run using
+credentials and target ids from settings. The CSV path stays fully functional and
+needs no credentials.
 """
 
 from __future__ import annotations
@@ -21,6 +21,8 @@ from app.core.db import get_db
 from app.core.logging import get_logger
 from app.core.security import require_api_key
 from app.ingestion.csv_importer import CSVImportError, import_csv_bytes
+from app.ingestion.http import HTTPError
+from app.ingestion.sync import ConnectorConfigError, build_connector, run_connector
 from app.models import (
     Account,
     Comment,
@@ -29,6 +31,7 @@ from app.models import (
     SyncCursor,
 )
 from app.schemas.ingestion import (
+    ConnectorRunResponse,
     CSVImportResponse,
     CursorStatus,
     IngestionStatusResponse,
@@ -36,8 +39,6 @@ from app.schemas.ingestion import (
 
 log = get_logger("api.ingestion")
 router = APIRouter(prefix="/ingestion", tags=["ingestion"], dependencies=[Depends(require_api_key)])
-
-_LIVE_CONNECTORS = {"meta", "youtube"}
 
 
 @router.post("/csv", response_model=CSVImportResponse)
@@ -111,17 +112,37 @@ async def status_endpoint(db: Session = Depends(get_db)) -> IngestionStatusRespo
     return IngestionStatusResponse(row_counts=counts, cursors=cursors)
 
 
-@router.post("/run")
-async def run_connector(connector: str = Form(...), account_id: int | None = Form(default=None)) -> dict:
-    if connector in _LIVE_CONNECTORS:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=(
-                f"Live connector '{connector}' lands in Week 3. Use POST /ingestion/csv "
-                "for the fully working import path today."
-            ),
-        )
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"Unknown connector '{connector}'. Known live connectors: meta, youtube.",
+@router.post("/run", response_model=ConnectorRunResponse)
+def run_connector_endpoint(
+    connector: str = Form(...),
+    db: Session = Depends(get_db),
+) -> ConnectorRunResponse:
+    """Run one incremental sync for a live connector (`youtube` or `meta`).
+
+    Credentials and target channel/page ids come from settings. Returns a summary
+    with upsert counts. 400 if the connector is unknown or not configured, 502 if
+    the platform API itself fails.
+    """
+    try:
+        conn = build_connector(connector)
+        result = run_connector(db, conn)
+        db.commit()
+    except ConnectorConfigError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except HTTPError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Connector API error: {exc}") from exc
+    except Exception:
+        db.rollback()
+        raise
+
+    return ConnectorRunResponse(
+        source=result.source,
+        accounts_upserted=result.accounts_upserted,
+        posts_upserted=result.posts_upserted,
+        snapshots_inserted=result.snapshots_inserted,
+        comments_upserted=result.comments_upserted,
+        rows_skipped=result.rows_skipped,
+        skip_reasons=result.skip_reasons,
     )

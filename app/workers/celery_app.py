@@ -20,7 +20,7 @@ celery_app = Celery(
     "community_management",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["app.workers.tasks_analyze"],
+    include=["app.workers.tasks_analyze", "app.workers.tasks_ingest"],
 )
 celery_app.conf.update(
     task_serializer="json",
@@ -36,6 +36,13 @@ celery_app.conf.beat_schedule = {
     "heartbeat-every-5-min": {
         "task": "app.workers.celery_app.heartbeat",
         "schedule": 300.0,
+    },
+    # Live ingestion of recent posts/comments (brief Section 7.2). Skips cleanly
+    # when the connector is not configured, so it is safe to schedule by default.
+    "ingest-recent-youtube-every-30-min": {
+        "task": "app.workers.tasks_ingest.ingest_recent_task",
+        "schedule": 1800.0,
+        "kwargs": {"connector": "youtube"},
     },
     # Sentiment analysis of newly ingested comments (brief Section 7.2).
     "analyze-new-comments-every-30-min": {

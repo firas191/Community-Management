@@ -82,8 +82,26 @@ Row counts per table and current sync cursors.
 
 `POST /ingestion/run`
 
-Triggers a live connector sync. Meta and YouTube connectors land in Week 3, so
-this returns 501 with a clear message until then. Use `/ingestion/csv` today.
+Runs one incremental sync for a live connector. Form field `connector` is
+`youtube` or `meta`. Credentials and target ids come from settings
+(`YOUTUBE_API_KEY` + `YOUTUBE_CHANNEL_IDS`, or `META_PAGE_ACCESS_TOKEN` +
+`META_PAGE_IDS`). Fetches new posts since each account's cursor, current metric
+snapshots, and comments, storing them idempotently.
+
+```json
+{
+  "source": "youtube",
+  "accounts_upserted": 2,
+  "posts_upserted": 14,
+  "snapshots_inserted": 14,
+  "comments_upserted": 63,
+  "rows_skipped": 0,
+  "skip_reasons": {}
+}
+```
+
+Returns 400 if the connector is unknown or not configured, 502 if the platform
+API itself fails. Re-running never duplicates (upserts + per-account cursors).
 
 ## KPIs
 

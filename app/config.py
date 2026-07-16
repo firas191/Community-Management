@@ -48,7 +48,9 @@ class Settings(BaseSettings):
     meta_app_id: str = Field(default="", alias="META_APP_ID")
     meta_app_secret: str = Field(default="", alias="META_APP_SECRET")
     meta_page_access_token: str = Field(default="", alias="META_PAGE_ACCESS_TOKEN")
+    meta_page_ids: str = Field(default="", alias="META_PAGE_IDS")
     youtube_api_key: str = Field(default="", alias="YOUTUBE_API_KEY")
+    youtube_channel_ids: str = Field(default="", alias="YOUTUBE_CHANNEL_IDS")
 
     # --- Experiment tracking (used from Week 4) ---
     mlflow_tracking_uri: str = Field(default="file:./mlruns", alias="MLFLOW_TRACKING_URI")
@@ -56,6 +58,14 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def youtube_channel_id_list(self) -> list[str]:
+        return [c.strip() for c in self.youtube_channel_ids.split(",") if c.strip()]
+
+    @property
+    def meta_page_id_list(self) -> list[str]:
+        return [p.strip() for p in self.meta_page_ids.split(",") if p.strip()]
 
 
 @lru_cache

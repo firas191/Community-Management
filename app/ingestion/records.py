@@ -69,6 +69,16 @@ class CommentRecord:
 
 
 @dataclass(slots=True)
+class RawEventRecord:
+    """A raw API payload to archive for debuggability and reprocessing (brief 7.1)."""
+
+    source: str
+    entity_type: str  # 'account' | 'post' | 'metric' | 'comment'
+    external_id: str | None
+    payload: dict
+
+
+@dataclass(slots=True)
 class IngestionResult:
     """Per-run summary logged by the normalizer (brief Section 13 logging)."""
 

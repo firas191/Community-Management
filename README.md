@@ -33,7 +33,7 @@ curl -H "X-API-Key: change-me" \
   "localhost:8000/kpi/overview?account_id=1&window=90d"
 ```
 
-Week 3 delivered: the multilingual sentiment pipeline (the differentiator).
+Week 3a delivered: the multilingual sentiment pipeline (the differentiator).
 Social-text preprocessing, language routing with a Tunisian Arabizi rule layer
 (French, English, Arabic, and Arabizi), the multilingual sentiment model behind
 an injectable backend, a batch analysis service with a scheduled Celery job, and
@@ -43,6 +43,19 @@ persist in a volume, so it works after `docker compose up --build` (the first
 call warms the model). For a local run outside Docker, install the model with
 `pip install -e ".[nlp]"`. Formulas and routing rules are in
 `docs/models_and_algorithms.md`.
+
+Week 3b delivered: live data connectors. A resilient HTTP client (retry/backoff
+on 429/5xx), a YouTube Data API v3 connector (public channels, no permission
+needed), and a Meta Graph API connector for Facebook Pages, both implementing the
+same connector interface and offline-tested with canned payloads. A cursor-based
+sync runner ingests incrementally, archives raw payloads, and stores idempotently;
+`POST /ingestion/run` triggers it and a Celery job runs it every 30 minutes. Set
+`YOUTUBE_CHANNEL_IDS` (and `YOUTUBE_API_KEY`) or `META_PAGE_IDS` (and
+`META_PAGE_ACCESS_TOKEN`) to ingest live:
+
+```bash
+curl -H "X-API-Key: change-me" -F "connector=youtube" localhost:8000/ingestion/run
+```
 
 ## Quick start
 

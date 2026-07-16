@@ -18,6 +18,16 @@ class CSVImportResponse(BaseModel):
     skip_reasons: dict[str, int] = Field(default_factory=dict)
 
 
+class ConnectorRunResponse(BaseModel):
+    source: str
+    accounts_upserted: int
+    posts_upserted: int
+    snapshots_inserted: int
+    comments_upserted: int
+    rows_skipped: int
+    skip_reasons: dict[str, int] = Field(default_factory=dict)
+
+
 class CursorStatus(BaseModel):
     source: str
     account_external_id: str
