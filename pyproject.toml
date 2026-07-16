@@ -52,6 +52,13 @@ nlp = [
     "protobuf==4.25.5",
 ]
 
+# Week 4 fine-tuning (Model B). Runs on a Colab/Kaggle GPU, not the app image.
+train = [
+    "datasets==3.2.0",
+    "accelerate==1.2.1",
+    "mlflow==2.19.0",
+]
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"

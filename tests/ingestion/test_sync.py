@@ -104,9 +104,15 @@ def test_second_run_is_incremental_and_idempotent(db_session):
     assert db_session.scalar(select(func.count()).select_from(Post)) == 2  # no duplicates
 
 
-def test_build_connector_guards():
-    # No channel/page ids configured in the test environment -> config error.
+def test_build_connector_guards(monkeypatch):
+    # Force empty config so the guards fire regardless of the local .env.
+    from app.config import settings
+
+    for attr in ("youtube_api_key", "youtube_channel_ids", "meta_page_access_token", "meta_page_ids"):
+        monkeypatch.setattr(settings, attr, "")
     with pytest.raises(ConnectorConfigError):
         build_connector("youtube")
+    with pytest.raises(ConnectorConfigError):
+        build_connector("meta")
     with pytest.raises(ConnectorConfigError):
         build_connector("nope")

@@ -27,6 +27,16 @@ class StubBackend:
         return out
 
 
+class ArabiziStubBackend:
+    """Stand-in for the fine-tuned Model B. Always positive, distinct model name."""
+
+    model_name = "arabizi-model"
+    model_version = "arabizi-1.0"
+
+    def predict(self, texts: list[str]) -> list[Prediction]:
+        return [Prediction("positive", 0.99) for _ in texts]
+
+
 class UnavailableBackend:
     """Simulates the NLP extras being absent: predict raises like the real loader."""
 

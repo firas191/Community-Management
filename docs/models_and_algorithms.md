@@ -175,8 +175,52 @@ distribution, a per-language breakdown, a daily net-sentiment trend, and deltas
 versus the previous window. Negative alerting flags a day whose negative share
 exceeds mean + 2 sigma with at least 10 comments (brief Section 11.5).
 
-## 3. Fine-tuned Arabizi model (Week 4)
+## 3. Fine-tuned Arabizi model, Model B (Week 4)
 
-Reserved. The TUNIZI fine-tuning protocol and per-language evaluation tables
-(macro-F1 for fr/en/ar/aeb-latn, before and after) are documented here when that
-work lands.
+Model A is multilingual but only incidentally good at Tunisian Arabizi. Model B is
+a specialist fine-tuned on the TUNIZI corpus (Tunisian Arabizi sentiment, labelled
+by native speakers) and routed to only for `aeb-latn` text.
+
+### 3.1 Training protocol
+
+`app/nlp/training/finetune_tunizi.py` (runs on a free Colab/Kaggle GPU; see
+`notebooks/finetune_tunizi.ipynb`):
+
+- Base model: `cardiffnlp/twitter-xlm-roberta-base` (same family as Model A).
+- Input is cleaned by the exact `preprocess` used at inference, so train and serve
+  match. Labels are normalized to positive/neutral/negative.
+- Seeded stratified 70/10/20 split, so the reported numbers are reproducible.
+- Max length 128, lr 2e-5, AdamW, up to 4 epochs, early stopping on validation
+  macro-F1. Class weights (inverse frequency) counter the class imbalance.
+- Label id order matches Model A (0=negative, 1=neutral, 2=positive), so the app
+  loads Model B with no change to the inference layer.
+- Everything is logged to MLflow; a model card and `metrics.json` are saved next to
+  the weights.
+
+### 3.2 Evaluation protocol
+
+Macro-F1 is the primary metric (classes are imbalanced), plus accuracy and
+per-class precision/recall (`app/nlp/training/metrics.py`, pure and unit-tested).
+`app/nlp/training/evaluate.py` runs the same held-out set through Model A and
+Model B and prints the per-language table. The delta on `aeb-latn` is the headline.
+
+Per-language macro-F1 (fill from `evaluate.py` output after training):
+
+| Language | Model A (baseline) | Model B (fine-tuned) | Delta |
+|---|---|---|---|
+| fr       | _tbd_ | _tbd_ | _tbd_ |
+| en       | _tbd_ | _tbd_ | _tbd_ |
+| ar       | _tbd_ | _tbd_ | _tbd_ |
+| aeb-latn | _tbd_ | _tbd_ | _tbd_ |
+
+A ~200-comment gold set from real client comments, annotated by two people with
+Cohen's kappa reported, makes the evaluation credible (brief Section 9.2).
+
+### 3.3 Serving Model B
+
+The routing layer never changes. Set `ARABIZI_MODEL` to the fine-tuned model (a
+local path mounted into the container, or a HuggingFace id) and the analyzer sends
+`aeb-latn` text to Model B and everything else to Model A. When `ARABIZI_MODEL` is
+empty, Arabizi falls back to Model A and is flagged `needs_arabizi_specialist`.
+Each stored label records which model produced it (`model_name`, `model_version`),
+so a model swap is fully traceable.

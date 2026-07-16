@@ -50,3 +50,12 @@ justification each. No em dashes. Short sentences. Concrete numbers.
 - **Raw API payloads are archived to `raw_events`.** Connectors accumulate the raw items during fetching; the sync runner persists them for debuggability and reprocessing (30-day retention, purge job to follow).
 - **The scheduled ingest task skips cleanly when unconfigured.** The Celery `ingest_recent` job runs every 30 minutes but returns early with a log line if the connector has no key or no target ids, so the schedule is safe to enable before credentials exist.
 - **The runner does not commit; the caller owns the transaction.** The API route commits (like the CSV path) and the Celery task uses `session_scope`, which commits. This matches the ingestion convention and keeps transaction boundaries at the edges.
+
+## Week 4 (Arabizi fine-tune)
+
+- **Model B is opt-in behind the existing routing layer.** `ARABIZI_MODEL` (a path or HuggingFace id) turns it on; the analyzer then sends only `aeb-latn` text to the specialist and everything else to Model A. Empty means fall back to Model A, flagged `needs_arabizi_specialist`. The inference interface never changes, so training and serving stay decoupled.
+- **The fine-tuned model uses Model A's label id order (0=neg, 1=neu, 2=pos).** So the app loads Model B through the same pipeline with no label-mapping change, and both models are interchangeable behind the `SentimentBackend` protocol.
+- **Training input is cleaned with the exact inference `preprocess`.** Train/serve skew is a classic silent accuracy killer; reusing one function removes it.
+- **Metrics are pure Python, not sklearn.** Macro-F1, per-class, and the per-language table are hand-computed and unit-tested, so the numbers in the report are trustworthy and the training extra stays lighter. Macro-F1 is primary because the classes are imbalanced.
+- **Seeded stratified 70/10/20 split.** Same seed and data yield the same split, which is what makes the reported before/after numbers reproducible.
+- **Training deps live in a `train` extra, run on a free GPU.** `datasets`, `accelerate`, and `mlflow` are not in the app image; fine-tuning runs on Colab/Kaggle (the base models are 110-270M params, minutes on a T4), and only the resulting weights come back to the app via `ARABIZI_MODEL`.

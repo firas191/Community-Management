@@ -57,6 +57,16 @@ sync runner ingests incrementally, archives raw payloads, and stores idempotentl
 curl -H "X-API-Key: change-me" -F "connector=youtube" localhost:8000/ingestion/run
 ```
 
+Week 4 delivered: the fine-tuned Tunisian Arabizi model (Model B). A training
+script (`app/nlp/training/finetune_tunizi.py`) and a Colab notebook fine-tune a
+specialist on the TUNIZI corpus with a seeded stratified split, class weights, and
+MLflow logging; an evaluation module produces the per-language macro-F1 table
+(the report's headline). The analyzer routes `aeb-latn` text to Model B when
+`ARABIZI_MODEL` is set (a mounted path or HuggingFace id) and falls back to Model A
+otherwise, all behind the unchanged inference interface. Metrics and data prep are
+pure and unit-tested. Training runs on a free Colab/Kaggle GPU:
+`pip install -e ".[nlp,train]"`. Protocol in `docs/models_and_algorithms.md`.
+
 ## Quick start
 
 ```bash

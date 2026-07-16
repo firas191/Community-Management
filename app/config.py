@@ -54,6 +54,9 @@ class Settings(BaseSettings):
 
     # --- Experiment tracking (used from Week 4) ---
     mlflow_tracking_uri: str = Field(default="file:./mlruns", alias="MLFLOW_TRACKING_URI")
+    # Fine-tuned Tunisian Arabizi model (Model B), a local path or HuggingFace id.
+    # Empty means Arabizi falls back to Model A (the multilingual baseline).
+    arabizi_model: str = Field(default="", alias="ARABIZI_MODEL")
 
     @property
     def cors_origin_list(self) -> list[str]:

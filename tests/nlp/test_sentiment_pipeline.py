@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.nlp.sentiment import SentimentAnalyzer
-from tests.nlp.stubs import StubBackend, UnavailableBackend
+from tests.nlp.stubs import ArabiziStubBackend, StubBackend, UnavailableBackend
 
 
 def test_analyze_routes_language_and_sentiment():
@@ -37,3 +37,21 @@ def test_non_arabizi_not_flagged():
 def test_model_unavailable_raises_runtimeerror():
     with pytest.raises(RuntimeError):
         SentimentAnalyzer(UnavailableBackend()).analyze(["hello world"])
+
+
+def test_arabizi_routes_to_specialist_when_present():
+    a = SentimentAnalyzer(StubBackend(), arabizi_backend=ArabiziStubBackend())
+    res = a.analyze(["3ajbetni barcha el video", "Great product overall"])
+    # Arabizi text goes to Model B; the flag clears because it was handled.
+    assert res[0]["language"] == "aeb-latn"
+    assert res[0]["model_name"] == "arabizi-model"
+    assert res[0]["needs_arabizi_specialist"] is False
+    # Non-Arabizi still goes to Model A.
+    assert res[1]["model_name"] == "stub-model"
+
+
+def test_arabizi_falls_back_to_main_without_specialist():
+    a = SentimentAnalyzer(StubBackend(), arabizi_backend=None)
+    res = a.analyze(["3ajbetni barcha el video"])
+    assert res[0]["model_name"] == "stub-model"
+    assert res[0]["needs_arabizi_specialist"] is True
