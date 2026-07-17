@@ -14,12 +14,18 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 
 from app.core.logging import configure_logging, get_logger
 from app.nlp.language import detect_language
 from app.nlp.preprocessing import preprocess
 from app.nlp.training import metrics
 from app.nlp.training.data import normalize_label
+
+# Use only the PyTorch backend (hosted GPU envs ship a TF/Flax that clashes with
+# the pinned protobuf; transformers auto-imports whatever backends are present).
+os.environ.setdefault("USE_TF", "0")
+os.environ.setdefault("USE_FLAX", "0")
 
 log = get_logger("training.evaluate")
 

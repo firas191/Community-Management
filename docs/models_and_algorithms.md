@@ -199,22 +199,30 @@ by native speakers) and routed to only for `aeb-latn` text.
 
 ### 3.2 Evaluation protocol
 
-Macro-F1 is the primary metric (classes are imbalanced), plus accuracy and
-per-class precision/recall (`app/nlp/training/metrics.py`, pure and unit-tested).
-`app/nlp/training/evaluate.py` runs the same held-out set through Model A and
-Model B and prints the per-language table. The delta on `aeb-latn` is the headline.
+Accuracy is the honest primary metric here, plus per-class precision/recall
+(`app/nlp/training/metrics.py`, pure and unit-tested). `app/nlp/training/evaluate.py`
+runs the same held-out set through Model A and Model B and prints the per-language
+table; the delta on `aeb-latn` is the headline.
 
-Per-language macro-F1 (fill from `evaluate.py` output after training):
+Result on the held-out TUNIZI test set (600 rows, seed 42, 4 epochs on a T4):
+accuracy 0.722, with balanced per-class F1 (positive 0.718, negative 0.725).
 
-| Language | Model A (baseline) | Model B (fine-tuned) | Delta |
+| Language | Model B accuracy | Model B macro-F1 | n |
 |---|---|---|---|
-| fr       | _tbd_ | _tbd_ | _tbd_ |
-| en       | _tbd_ | _tbd_ | _tbd_ |
-| ar       | _tbd_ | _tbd_ | _tbd_ |
-| aeb-latn | _tbd_ | _tbd_ | _tbd_ |
+| aeb-latn | 0.724 | 0.480 | 395 |
+| other    | 0.714 | 0.470 | 171 |
+| fr       | 0.846 | 0.564 | 13  |
+| en       | 0.667 | 0.407 | 21  |
+
+Note on the macro-F1 numbers: TUNIZI is a binary corpus (positive/negative, no
+neutral), so the three-class macro-F1 averages in an unavoidable 0.0 for the absent
+neutral class and lands near 0.48. The real signal is the ~0.72 accuracy and the
+~0.72 F1 on each of the two present classes. The `evaluate.py` before/after run
+produces the Model A baseline column and the `aeb-latn` delta for the report.
 
 A ~200-comment gold set from real client comments, annotated by two people with
-Cohen's kappa reported, makes the evaluation credible (brief Section 9.2).
+Cohen's kappa reported, would make the evaluation even more credible (brief
+Section 9.2).
 
 ### 3.3 Serving Model B
 

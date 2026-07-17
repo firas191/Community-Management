@@ -20,12 +20,20 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 from pathlib import Path
 
 from app.core.logging import configure_logging, get_logger
 from app.nlp.preprocessing import preprocess
 from app.nlp.training import metrics
 from app.nlp.training.data import class_weights, normalize_label, stratified_split
+
+# Use only the PyTorch backend. Hosted GPU envs (Kaggle/Colab) often ship a
+# TensorFlow/Flax that is ABI-incompatible with the pinned protobuf, and
+# transformers auto-imports whichever backends are present. We never use TF/Flax.
+# Set before main() imports transformers (the app imports above do not).
+os.environ.setdefault("USE_TF", "0")
+os.environ.setdefault("USE_FLAX", "0")
 
 log = get_logger("training.finetune")
 

@@ -39,8 +39,11 @@ services:
     image: community_management:app
     env_file: .env
     # Model weights download here on first use and persist across restarts.
+    # The fine-tuned Arabizi model (Model B) is bind-mounted read-only; set
+    # ARABIZI_MODEL=/models/arabizi in .env to route Arabizi to it.
     volumes:
       - hfcache:/models/hf
+      - ./models/arabizi:/models/arabizi:ro
     ports:
       - "8000:8000"
     depends_on:
@@ -60,6 +63,7 @@ services:
     env_file: .env
     volumes:
       - hfcache:/models/hf
+      - ./models/arabizi:/models/arabizi:ro
     depends_on:
       db:
         condition: service_healthy
