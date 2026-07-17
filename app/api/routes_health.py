@@ -12,9 +12,10 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app import __version__
+from app.config import settings
 from app.core.cache import ping as redis_ping
 from app.core.db import get_db
-from app.nlp.sentiment import SENTIMENT_MODEL_VERSION
+from app.nlp.sentiment import ARABIZI_MODEL_VERSION, SENTIMENT_MODEL_VERSION
 from app.schemas.health import DependencyStatus, HealthResponse, LivenessResponse
 from config.constants import (
     EMBEDDING_MODEL,
@@ -47,9 +48,15 @@ async def health(db: Session = Depends(get_db)) -> HealthResponse:
 
 @router.get("/meta/models", tags=["meta"])
 async def models() -> dict:
-    # Registry of models the system will load. Versions filled in as weeks land.
+    # Registry of models the system loads. The Arabizi entry reflects the live
+    # ARABIZI_MODEL config: when set (Model B deployed) it reports the real path
+    # and version; when empty, Arabizi falls back to the multilingual Model A.
+    if settings.arabizi_model:
+        arabizi = {"name": settings.arabizi_model, "version": ARABIZI_MODEL_VERSION, "active": True}
+    else:
+        arabizi = {"name": "community-management-arabizi", "version": "not_configured", "active": False}
     return {
         "sentiment_multilingual": {"name": SENTIMENT_MODEL_MULTILINGUAL, "version": SENTIMENT_MODEL_VERSION},
         "embedding": {"name": EMBEDDING_MODEL, "version": "pending"},
-        "arabizi_finetuned": {"name": "community-management-arabizi", "version": "not_trained"},
+        "arabizi_finetuned": arabizi,
     }

@@ -9,7 +9,9 @@ from tests.nlp.stubs import ArabiziStubBackend, StubBackend, UnavailableBackend
 
 
 def test_analyze_routes_language_and_sentiment():
-    a = SentimentAnalyzer(StubBackend())
+    # arabizi_backend=None pins the "no specialist" path so the test does not
+    # depend on the ambient ARABIZI_MODEL env (which is set when Model B is deployed).
+    a = SentimentAnalyzer(StubBackend(), arabizi_backend=None)
     res = a.analyze(["3ajbetni barcha el video", "Not worth the price honestly", "منتج رائع"])
     assert res[0]["language"] == "aeb-latn"
     assert res[0]["needs_arabizi_specialist"] is True
@@ -21,22 +23,22 @@ def test_analyze_routes_language_and_sentiment():
 
 
 def test_analyze_empty_list_returns_empty():
-    assert SentimentAnalyzer(StubBackend()).analyze([]) == []
+    assert SentimentAnalyzer(StubBackend(), arabizi_backend=None).analyze([]) == []
 
 
 def test_emoji_polarity_travels_through():
-    res = SentimentAnalyzer(StubBackend()).analyze(["love it 😍🔥"])
+    res = SentimentAnalyzer(StubBackend(), arabizi_backend=None).analyze(["love it 😍🔥"])
     assert res[0]["emoji_polarity"] == 1.0
 
 
 def test_non_arabizi_not_flagged():
-    res = SentimentAnalyzer(StubBackend()).analyze(["Great product overall"])
+    res = SentimentAnalyzer(StubBackend(), arabizi_backend=None).analyze(["Great product overall"])
     assert res[0]["needs_arabizi_specialist"] is False
 
 
 def test_model_unavailable_raises_runtimeerror():
     with pytest.raises(RuntimeError):
-        SentimentAnalyzer(UnavailableBackend()).analyze(["hello world"])
+        SentimentAnalyzer(UnavailableBackend(), arabizi_backend=None).analyze(["hello world"])
 
 
 def test_arabizi_routes_to_specialist_when_present():

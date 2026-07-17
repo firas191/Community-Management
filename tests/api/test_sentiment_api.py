@@ -24,7 +24,7 @@ def client(db_session, api_get_db):
     # Fresh session per request (like production): /summary only sees what /run
     # actually committed, so a missing commit fails the test instead of hiding.
     app.dependency_overrides[get_db] = api_get_db
-    app.dependency_overrides[get_analyzer] = lambda: SentimentAnalyzer(StubBackend())
+    app.dependency_overrides[get_analyzer] = lambda: SentimentAnalyzer(StubBackend(), arabizi_backend=None)
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -54,7 +54,7 @@ def test_analyze_returns_language_and_sentiment(client):
 
 def test_analyze_returns_503_when_model_unavailable(db_session):
     app.dependency_overrides[get_db] = lambda: db_session
-    app.dependency_overrides[get_analyzer] = lambda: SentimentAnalyzer(UnavailableBackend())
+    app.dependency_overrides[get_analyzer] = lambda: SentimentAnalyzer(UnavailableBackend(), arabizi_backend=None)
     try:
         c = TestClient(app)
         r = c.post("/sentiment/analyze", json={"texts": ["hello"]}, headers=HEADERS)

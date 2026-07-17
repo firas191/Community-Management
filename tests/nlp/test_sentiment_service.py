@@ -21,7 +21,7 @@ def seeded(db_session):
 
 
 def _analyzer() -> SentimentAnalyzer:
-    return SentimentAnalyzer(StubBackend())
+    return SentimentAnalyzer(StubBackend(), arabizi_backend=None)
 
 
 def _ig(db) -> int:
