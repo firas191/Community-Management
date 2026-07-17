@@ -70,6 +70,9 @@ include = ["app*", "config*"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Notebooks legitimately interleave imports with code (E402) and set env vars before
+# imports; they are not application code, so they are not linted as such.
+extend-exclude = ["*.ipynb"]
 
 [tool.ruff.lint]
 # E,F pycodestyle/pyflakes; I isort; B bugbear; UP pyupgrade; N naming.
