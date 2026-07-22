@@ -59,3 +59,14 @@ justification each. No em dashes. Short sentences. Concrete numbers.
 - **Metrics are pure Python, not sklearn.** Macro-F1, per-class, and the per-language table are hand-computed and unit-tested, so the numbers in the report are trustworthy and the training extra stays lighter. Macro-F1 is primary because the classes are imbalanced.
 - **Seeded stratified 70/10/20 split.** Same seed and data yield the same split, which is what makes the reported before/after numbers reproducible.
 - **Training deps live in a `train` extra, run on a free GPU.** `datasets`, `accelerate`, and `mlflow` are not in the app image; fine-tuning runs on Colab/Kaggle (the base models are 110-270M params, minutes on a T4), and only the resulting weights come back to the app via `ARABIZI_MODEL`.
+
+## Week 5 (recommendation engine)
+
+- **Every recommendation carries n, lift, and confidence.** A ranked list of bare numbers is not actionable or trustworthy. Sample size, lift over the account's own baseline, and a confidence tier travel with every pick, so the dashboard can justify advice instead of asserting it (brief 6.2, 8.5).
+- **Groups are ranked by a shrinkage estimate, not the raw mean.** `(sum + K*baseline)/(n+K)` with `K=5` pulls thin groups toward the baseline, so one lucky post cannot win the ranking. This is standard empirical-Bayes shrinkage and needs no per-account tuning. The raw mean is still reported.
+- **Confidence tiers are sample-size thresholds: n>=8 high, n>=4 medium, n>=2 low.** Below 2 a group is not surfaced at all. Fixed thresholds in one place keep the rule consistent and tunable.
+- **Best-time buckets are formed in Africa/Tunis, not UTC.** "Thursday 8pm" is only meaningful in the client's local time, so publish times are converted before day/hour bucketing. Day and hour marginals are returned alongside cells because cells are sparse and the marginals are the more robust guidance.
+- **Recommendations reuse the KPI primary-ER basis (ERR else ERF).** The same honest basis logic drives KPIs and recommendations, so a YouTube account with no reach gets ERF-based advice instead of a column of nulls, and the basis is disclosed.
+- **Hashtag credit is per-post, Unicode-aware.** Each post lends its ER to every unique hashtag it used, so a hashtag's `n` is the number of posts using it. The extractor matches Unicode word characters, so Arabic hashtags count.
+- **Thin data returns a reason, never a guess.** `insufficient_data`, `no_engagement_signal`, and `no_hashtags` mirror the KPI null-with-reason rule.
+- **Recommendations are POST and persisted.** Each call generates and writes a `recommendations` row (kind/payload/confidence/evidence) for an auditable history of what was advised. The route commits; the service only stages rows (the project transaction convention).

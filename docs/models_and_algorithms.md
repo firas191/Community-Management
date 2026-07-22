@@ -232,3 +232,68 @@ local path mounted into the container, or a HuggingFace id) and the analyzer sen
 empty, Arabizi falls back to Model A and is flagged `needs_arabizi_specialist`.
 Each stored label records which model produced it (`model_name`, `model_version`),
 so a model swap is fully traceable.
+
+## 4. Recommendation engine (Week 5)
+
+Turns an account's posts into explainable recommendations: best time to post,
+best content type, and best hashtags. Every recommendation carries its evidence,
+so the dashboard can justify each pick rather than assert it (brief Section 8.5).
+Same strict layering as the KPI engine: `analytics/recommend.py` is pure math,
+`analytics/recommend_service.py` is the only DB-facing layer.
+
+### 4.1 Evidence on every recommendation
+
+Each ranked item reports three things:
+
+- `n`: the sample size the pick rests on.
+- `lift`: the group's mean engagement rate divided by the account's own baseline
+  (the mean ER across all its posts in the window). `lift > 1` means above average.
+- `confidence`: a tier from the sample size. `n >= 8` is `high`, `n >= 4` is
+  `medium`, `n >= 2` is `low`, and below 2 the group is too thin to surface at all
+  (`confidence: null`). Thresholds live in one place and are easy to tune.
+
+### 4.2 Shrinkage so small samples do not win on luck
+
+Ranking by raw mean lets a single lucky post at 3am beat a well-sampled slot. To
+prevent that, each group is ranked by a shrinkage estimate that pulls thin groups
+toward the baseline:
+
+```
+shrunk_score = (sum(engagement_rate) + K * baseline) / (n + K),  K = 5
+```
+
+A group with `n` far below `K` sits near the baseline and cannot top the list on
+noise; a well-sampled group is dominated by its own mean. `K = 5` means a slot
+needs on the order of five posts before its own average carries the ranking. The
+raw mean is still reported next to the shrunk score, so nothing is hidden. This is
+a standard empirical-Bayes shrinkage, chosen because it needs no per-account tuning.
+
+### 4.3 Best time to post
+
+Publish times are converted from UTC to the display timezone (Africa/Tunis) before
+bucketing, because "Thursday 8pm" only means anything in the client's local time.
+Each post contributes its primary engagement rate (ERR when reach exists, else ERF,
+the same basis logic as the KPI engine) to three groupings: the
+(day-of-week x hour) cell, the day-of-week marginal, and the hour marginal. Cells
+are ranked by the shrunk score and only surfaced when `n >= 2`. Because cells are
+sparse, the day and hour marginals aggregate more data per bucket and are the more
+robust guidance; all three are returned.
+
+### 4.4 Content type and hashtags
+
+Both reduce to ranking categories by shrunk engagement rate. For content type the
+category is the post's `content_type`; for hashtags each post contributes its ER to
+every unique hashtag it used (extracted with a Unicode-aware rule, so Arabic tags
+like `#نجاح` count), and a hashtag's `n` is the number of posts that used it. The
+same evidence and shrinkage apply.
+
+### 4.5 Honesty and persistence
+
+Not enough data returns a stable `reason` (`insufficient_data`,
+`no_engagement_signal`, `no_hashtags`), never a fabricated pick, mirroring the KPI
+null-with-reason rule. Every generated recommendation is written to the
+`recommendations` table (`kind`, `payload`, `confidence`, `evidence`) so the
+dashboard has an auditable history of what was advised and on what basis. The API
+routes commit; the service layer only stages rows (the project transaction
+convention). All ranking and evidence math in `recommend.py` is unit-tested against
+hand-computed fixtures.

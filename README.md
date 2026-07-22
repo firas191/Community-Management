@@ -1,88 +1,78 @@
 # Community Management
 
-<!-- Replace OWNER with your GitHub username or org once the repo is pushed. -->
-[![CI](https://github.com/firas191/community-management/actions/workflows/ci.yml/badge.svg)](https://github.com/firas191/community-management/actions/workflows/ci.yml)
+[![CI](https://github.com/firas191/Community-Management/actions/workflows/ci.yml/badge.svg)](https://github.com/firas191/Community-Management/actions/workflows/ci.yml)
 
-Intelligent Community Management Analytics Engine. The intelligence layer of a
-social media community management application. Multilingual sentiment (French,
-English, Arabic, Tunisian Arabizi), KPI and recommendation engines, a free-tier
-multi-provider LLM gateway, and a grounded analyst agent.
+The data and analytics side of a social-media community-management app. It ingests
+posts and comments, computes engagement KPIs, scores sentiment in French, English,
+Arabic and Tunisian Arabizi, and turns an account's history into posting
+recommendations. A free LLM gateway and a grounded analyst agent are the last two
+pieces of the roadmap.
 
-This repository is the IA / Data and Analytics module. It is built in the
-8-week roadmap order from the project brief. Every module ships with real data
-paths, tests, and documentation.
+It's built one week at a time from the project brief. Everything runs on real data
+and has tests.
 
-## Status
+## Progress
 
-Week 1 delivered: repository, Docker Compose, PostgreSQL schema and migration,
-config, a working CSV importer, synthetic dev fixtures, and health plus
-ingestion endpoints. The stack runs with no external API key. The CSV import
-path and seed fixtures need no credentials.
+**Week 1 — skeleton.** Docker Compose (api, worker, beat, Postgres, Redis), the
+Postgres schema and Alembic migrations, config, a CSV importer, and synthetic
+fixtures for local development. None of this needs an API key; you can bring the
+stack up and import a CSV with no credentials.
 
-Week 2 delivered: the KPI engine. Pure, unit-tested formulas for all post-level
-and account-level KPIs with null-with-reason guards, temporal aggregation
-(hour/day/week/month, gap-filled, rolling means), cross-platform z-scores, and
-four endpoints under `/kpi` (overview, timeseries, by-platform, top-posts) with
-15-minute Redis caching that degrades gracefully. Formulas are documented in
-`docs/models_and_algorithms.md`.
-
-Try it after seeding:
+**Week 2 — KPI engine.** Post- and account-level metrics written as pure functions,
+each checked against a hand-worked example. A rate with a missing or zero
+denominator returns `null` and a reason code, never a misleading `0`. There's
+time-bucketed history (hour/day/week/month, gaps filled, rolling means),
+cross-platform z-scores, and four endpoints under `/kpi`. Responses are cached in
+Redis for 15 minutes, but the numbers never depend on the cache being up.
 
 ```bash
-curl -H "X-API-Key: change-me" \
-  "localhost:8000/kpi/overview?account_id=1&window=90d"
+curl -H "X-API-Key: change-me" "localhost:8000/kpi/overview?account_id=1&window=90d"
 ```
 
-Week 3a delivered: the multilingual sentiment pipeline (the differentiator).
-Social-text preprocessing, language routing with a Tunisian Arabizi rule layer
-(French, English, Arabic, and Arabizi), the multilingual sentiment model behind
-an injectable backend, a batch analysis service with a scheduled Celery job, and
-the `/sentiment/*` API. The Docker image bundles the sentiment stack (CPU torch +
-transformers); the model weights download on the first `/sentiment` request and
-persist in a volume, so it works after `docker compose up --build` (the first
-call warms the model). For a local run outside Docker, install the model with
-`pip install -e ".[nlp]"`. Formulas and routing rules are in
-`docs/models_and_algorithms.md`.
+**Week 3 — sentiment.** Text is cleaned, its language is detected (with a
+hand-written rule layer for Tunisian Arabizi, the hard case generic detectors get
+wrong), and then classified by a multilingual model. The model sits behind an
+interface so the pipeline is testable without downloading a gigabyte of weights.
+The same week added live connectors: a YouTube Data API v3 connector for public
+channels (just needs an API key) and a Meta Graph connector for Facebook Pages,
+both feeding a cursor-based sync that ingests incrementally and keeps the raw
+payloads. `POST /ingestion/run` triggers a sync; a Celery job also runs it every
+30 minutes.
 
-Week 3b delivered: live data connectors. A resilient HTTP client (retry/backoff
-on 429/5xx), a YouTube Data API v3 connector (public channels, no permission
-needed), and a Meta Graph API connector for Facebook Pages, both implementing the
-same connector interface and offline-tested with canned payloads. A cursor-based
-sync runner ingests incrementally, archives raw payloads, and stores idempotently;
-`POST /ingestion/run` triggers it and a Celery job runs it every 30 minutes. Set
-`YOUTUBE_CHANNEL_IDS` (and `YOUTUBE_API_KEY`) or `META_PAGE_IDS` (and
-`META_PAGE_ACCESS_TOKEN`) to ingest live:
+**Week 4 — Arabizi model.** A fine-tune of the sentiment model on the TUNIZI
+corpus, trained on a free Colab/Kaggle GPU (script and notebook included). When
+`ARABIZI_MODEL` points at the trained model, Arabizi comments route to it and
+everything else stays on the base model; the interface doesn't change either way.
+The held-out accuracy and per-language numbers are in `docs/models_and_algorithms.md`.
+
+**Week 5 — recommendations.** Best time to post (day and hour, in Tunis local
+time), best content type, and best hashtags. Each pick comes with its evidence:
+how many posts it's based on, how it compares to the account's own average, and a
+confidence tier. A single lucky post can't top the ranking — thin slots are pulled
+back toward the average — and if there isn't enough data the engine says so instead
+of guessing. Results are saved to the `recommendations` table.
 
 ```bash
-curl -H "X-API-Key: change-me" -F "connector=youtube" localhost:8000/ingestion/run
+curl -H "X-API-Key: change-me" -X POST \
+  "localhost:8000/recommendations/best-time?account_id=1&window=90d"
 ```
 
-Week 4 delivered: the fine-tuned Tunisian Arabizi model (Model B). A training
-script (`app/nlp/training/finetune_tunizi.py`) and a Colab notebook fine-tune a
-specialist on the TUNIZI corpus with a seeded stratified split, class weights, and
-MLflow logging; an evaluation module produces the per-language macro-F1 table
-(the report's headline). The analyzer routes `aeb-latn` text to Model B when
-`ARABIZI_MODEL` is set (a mounted path or HuggingFace id) and falls back to Model A
-otherwise, all behind the unchanged inference interface. Metrics and data prep are
-pure and unit-tested. Training runs on a free Colab/Kaggle GPU:
-`pip install -e ".[nlp,train]"`. Protocol in `docs/models_and_algorithms.md`.
-
-## Quick start
+## Running it
 
 ```bash
-cp .env.example .env         # defaults work as-is for local run
+cp .env.example .env         # the defaults work for a local run
 docker compose up --build    # api:8000, worker, beat, postgres, redis
 ```
 
 Then, in another shell:
 
 ```bash
-docker compose exec api alembic upgrade head   # apply migrations
-make seed                                       # load synthetic dev fixtures
+docker compose exec api alembic upgrade head   # migrations
+make seed                                       # synthetic demo data
 curl -H "X-API-Key: change-me" localhost:8000/health
 ```
 
-Import a real Meta Business Suite CSV export:
+To load a real Meta Business Suite CSV export:
 
 ```bash
 curl -H "X-API-Key: change-me" \
@@ -91,44 +81,44 @@ curl -H "X-API-Key: change-me" \
   localhost:8000/ingestion/csv
 ```
 
-OpenAPI docs are at http://localhost:8000/docs.
+API docs are at http://localhost:8000/docs.
 
-## Commands
+## Make targets
 
 ```bash
-make up          # docker compose up --build
-make down        # stop the stack
-make migrate     # alembic upgrade head (inside the api container)
-make seed        # load synthetic dev fixtures
-make test        # run the pytest suite
-make lint        # ruff check
-make fmt         # ruff format
+make up       # docker compose up --build
+make down     # stop the stack
+make migrate  # alembic upgrade head (in the api container)
+make seed     # load synthetic demo data
+make test     # pytest
+make lint     # ruff check
+make fmt      # ruff format
 ```
 
 ## Layout
 
 ```
-app/        FastAPI service: config, core, models, schemas, api routes
-app/ingestion   connector protocol, normalizer, CSV importer, synthetic fixtures
-config/     constants and CSV column-mapping profiles (config over hardcoding)
-alembic/    migrations
-tests/      pytest suite, mirrors app/
-docs/       architecture, data dictionary, models and algorithms
-scripts/    seed and backfill utilities
+app/            FastAPI service: config, core, models, schemas, routes
+app/analytics   KPI formulas, aggregation, recommendations
+app/nlp         preprocessing, language routing, sentiment, training
+app/ingestion   connectors, normalizer, CSV importer, synthetic fixtures
+config/         constants and CSV column-mapping profiles
+alembic/        migrations
+tests/          pytest suite, mirrors app/
+docs/           architecture, data dictionary, models and algorithms
 ```
 
-## Data strategy
+## Data
 
-The default plan needs no company access and stays 100% real. Public YouTube is
-the primary live source (added Week 3). A self-owned Meta test page proves the
-Meta connector. Kaggle datasets stress-test the KPI code through the CSV
-importer. TUNIZI trains the Arabizi sentiment model. Reach and impressions are
-owner-private on public sources, so reach-based KPIs return null with a reason.
+The plan is to stay on real data without needing anyone's private account. Public
+YouTube is the main live source, a self-owned Meta test page proves the Meta
+connector, Kaggle exports exercise the CSV path, and TUNIZI trains the Arabizi
+model. Reach and impressions aren't public on those sources, so any reach-based KPI
+returns null with a reason rather than a made-up number.
 
-## Principle
+That last point is the rule the whole project follows: when something can't be
+computed honestly, say why instead of showing a zero. Recommendations carry their
+sample size and confidence, sentiment labels carry the model that produced them,
+and counts are stored as timestamped snapshots rather than overwritten.
 
-Honesty over false completeness. Null with a reason instead of a lying zero.
-Evidence (n, lift, confidence) on every recommendation. Model name and version
-on every sentiment label. Snapshots instead of overwritten counters.
-
-See `DECISIONS.md` for open-detail choices and `docs/` for full documentation.
+See `DECISIONS.md` for the choices made along the way and `docs/` for the details.
