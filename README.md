@@ -57,6 +57,22 @@ curl -H "X-API-Key: change-me" -X POST \
   "localhost:8000/recommendations/best-time?account_id=1&window=90d"
 ```
 
+**Week 6 — LLM gateway.** A small wrapper over the free LLM providers (Groq,
+Gemini, OpenRouter, NVIDIA, or a local Ollama) built on litellm. Since no free tier
+is dependable on its own, it tries a chain of models and takes the first that
+answers; providers with no key set are skipped. Every attempt is logged to
+`llm_calls` with its tokens and latency, so a failover is visible after the fact.
+On top of that is `POST /llm/generate`, which writes caption options for a brief
+and, if you pass an account, uses that account's recent posts as a voice reference.
+`GET /llm/providers` shows what's configured. Add a key to `.env` to use it — with
+none set the endpoint returns 503 instead of pretending.
+
+```bash
+curl -H "X-API-Key: change-me" -X POST localhost:8000/llm/generate \
+  -H "Content-Type: application/json" \
+  -d '{"brief":"weekend promo on grilled sandwiches","account_id":1,"n":3}'
+```
+
 ## Running it
 
 ```bash

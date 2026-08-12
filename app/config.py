@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     )
     llm_primary: str = Field(default="groq/llama-3.3-70b-versatile", alias="LLM_PRIMARY")
     llm_longctx: str = Field(default="gemini/gemini-2.5-flash", alias="LLM_LONGCTX")
+    # Extra fallback models tried after primary/long-context, comma-separated
+    # litellm model strings (e.g. "openrouter/meta-llama/llama-3.1-8b-instruct:free").
+    llm_fallbacks: str = Field(default="", alias="LLM_FALLBACKS")
 
     # --- Platform connectors (used from Week 3) ---
     meta_app_id: str = Field(default="", alias="META_APP_ID")
@@ -69,6 +72,10 @@ class Settings(BaseSettings):
     @property
     def meta_page_id_list(self) -> list[str]:
         return [p.strip() for p in self.meta_page_ids.split(",") if p.strip()]
+
+    @property
+    def llm_fallback_list(self) -> list[str]:
+        return [m.strip() for m in self.llm_fallbacks.split(",") if m.strip()]
 
 
 @lru_cache

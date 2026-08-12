@@ -297,3 +297,46 @@ dashboard has an auditable history of what was advised and on what basis. The AP
 routes commit; the service layer only stages rows (the project transaction
 convention). All ranking and evidence math in `recommend.py` is unit-tested against
 hand-computed fixtures.
+
+## 5. LLM gateway and content generation (Week 6)
+
+The generation features run on free-tier LLM providers (Groq, Gemini, OpenRouter,
+NVIDIA NIM, and a local Ollama). No single free tier is reliable enough to depend
+on, so the gateway is built around failover rather than a single provider.
+
+### 5.1 Failover chain
+
+A litellm model string encodes its provider: `groq/llama-3.3-70b-versatile`,
+`gemini/gemini-2.5-flash`, `openrouter/...`. The gateway builds a chain from
+`LLM_PRIMARY`, `LLM_LONGCTX`, and any `LLM_FALLBACKS`, then drops every model whose
+provider key is not set and de-duplicates while preserving order. So the chain only
+ever contains models that can actually be called, in preference order. On a request
+it tries each in turn and returns the first success; if all fail it raises rather
+than inventing an answer.
+
+litellm is injected into the gateway and imported lazily. Importing the module
+costs nothing, the whole failover loop is unit-tested with a fake completion
+function (no network), and the app boots even without the `llm` extra installed
+(the endpoint then returns 503 with an install hint, exactly like the sentiment
+model without the `nlp` extra).
+
+### 5.2 Observability
+
+Every attempt is timed and recorded, and the service writes one `llm_calls` row per
+attempt (`provider`, `model`, `purpose`, token counts, `latency_ms`, `status`,
+`fallback_depth`). A failover is therefore visible in the table: a failed row at
+depth 0 followed by an ok row at depth 1. Successful responses are cached in Redis
+for an hour, keyed by a hash of the messages and parameters; the cache is optional
+and degrades silently, like the KPI cache.
+
+### 5.3 Caption generation
+
+`POST /llm/generate` turns a brief into N caption options. The prompt asks for a
+JSON array of strings, but models are inconsistent, so the parser tries several
+shapes in turn: a raw JSON array, a fenced ```json block, a `{"variants": [...]}`
+object, and finally a numbered or bulleted list. It de-duplicates, trims to N, and
+never raises on a malformed reply. When an `account_id` is given, the account's most
+recent captions are passed to the model as a brand-voice reference. Each result is
+stored in `generated_contents` (`request`, `variants`, `provider`, `model`,
+`latency_ms`). `GET /llm/providers` reports which providers are configured and the
+resulting chain, without leaking any key.

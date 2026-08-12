@@ -29,7 +29,9 @@ dependencies = [
     # in the `nlp` extra; language routing works without it.
     "langdetect==1.0.9",
     # HTTP client for the live connectors (Meta Graph API, YouTube Data API).
-    "httpx==0.28.1",
+    # 0.27.2 (not 0.28) so litellm's httpx<0.28 constraint is satisfied. Our usage
+    # (httpx.get, httpx.HTTPError) is identical across both.
+    "httpx==0.27.2",
 ]
 
 [project.optional-dependencies]
@@ -57,6 +59,15 @@ train = [
     "datasets==3.2.0",
     "accelerate==1.2.1",
     "mlflow==2.19.0",
+]
+
+# Week 6 LLM gateway. litellm gives one interface (and failover) across Groq,
+# Gemini, OpenRouter, NVIDIA NIM, and a local Ollama.
+llm = [
+    "litellm==1.55.10",
+    # litellm 1.55 targets the openai 1.x SDK; pin below 2.0 so a newer major
+    # (which changed the SDK surface litellm calls) is not pulled in.
+    "openai>=1.55.3,<2",
 ]
 
 [build-system]

@@ -70,3 +70,14 @@ justification each. No em dashes. Short sentences. Concrete numbers.
 - **Hashtag credit is per-post, Unicode-aware.** Each post lends its ER to every unique hashtag it used, so a hashtag's `n` is the number of posts using it. The extractor matches Unicode word characters, so Arabic hashtags count.
 - **Thin data returns a reason, never a guess.** `insufficient_data`, `no_engagement_signal`, and `no_hashtags` mirror the KPI null-with-reason rule.
 - **Recommendations are POST and persisted.** Each call generates and writes a `recommendations` row (kind/payload/confidence/evidence) for an auditable history of what was advised. The route commits; the service only stages rows (the project transaction convention).
+
+## Week 6 (LLM gateway + generation)
+
+- **The gateway is built around failover, not a single provider.** No free tier is reliable enough to depend on, so a request walks a chain (primary, long-context, then configured fallbacks) and returns the first success. This is the whole point of a multi-provider gateway per the brief.
+- **The chain is filtered to configured providers and de-duplicated.** A model whose provider key is not set is dropped before any call, so the gateway never wastes an attempt on a provider that cannot answer, and a missing key degrades gracefully instead of erroring.
+- **litellm is injected and imported lazily.** The failover loop takes a `completion_fn`, so the entire gateway is unit-tested with a fake and no network. Importing the module is free, and the app boots without the `llm` extra (the endpoint returns 503 with an install hint, like sentiment without `nlp`).
+- **One `llm_calls` row per attempt.** Observability is the brief's requirement (11.3); logging every attempt, not just the winner, makes a failover visible in the table (error at depth 0, ok at depth 1) with tokens and latency.
+- **Provider keys are passed explicitly, not via litellm's env autodiscovery.** litellm's expected env names differ from ours (`GEMINI_API_KEY` vs our `GOOGLE_API_KEY`), so the gateway resolves the key from settings by provider and passes it in. One place to change, no surprise env coupling.
+- **Variant parsing is defensive.** Models return JSON arrays, fenced blocks, wrapper objects, or numbered lists interchangeably, so the parser tries each shape and never raises on a bad reply. Generation should degrade to "fewer options", never a 500.
+- **Generation is grounded in brand voice when an account is given.** The account's recent captions are passed as a reference so output matches the account's style, not a generic voice.
+- **litellm lives in an `llm` extra, added to the app image.** Unlike `train`, generation runs in the app, so the image installs `.[dev,nlp,llm]`. litellm is light (no torch), so this does not meaningfully grow the image.
