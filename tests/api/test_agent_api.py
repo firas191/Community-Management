@@ -12,6 +12,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
+# The route compiles a LangGraph state machine, so without the agent extra it can
+# only answer 503. Skip rather than fail, the same contract the real-model
+# sentiment smoke test uses. CI installs `.[dev,agent]`, so these do run there.
+pytest.importorskip("langgraph", reason="agent tests need the agent extra: pip install -e '.[agent]'")
+
 from app.api.routes_llm import get_gateway
 from app.core.db import get_db
 from app.ingestion import synthetic

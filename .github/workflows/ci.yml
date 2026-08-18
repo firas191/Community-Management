@@ -55,13 +55,23 @@ jobs:
           python-version: "3.11"
           cache: pip
 
+      # `agent` is included because the agent route compiles a LangGraph state
+      # machine, so without it those tests would only ever see a 503. LangGraph is
+      # pure Python and adds seconds. `nlp` and `llm` stay out: their model calls
+      # are injected in tests, so installing torch or litellm would add minutes
+      # without testing anything extra. `topics` is excluded by design (its numba
+      # chain caps numpy below the pin the analytics layer needs).
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev,agent]"
 
       - name: Lint (ruff)
         run: ruff check . --output-format=github
 
+      # Coverage is reported for analytics and nlp (the brief's target areas), and
+      # is informational: the hard gates are the test results and ruff above.
+      # nlp reads lower than analytics because the real model backends cannot run
+      # without the nlp extra, which CI deliberately does not install.
       - name: Run tests
-        run: pytest --cov=app/analytics --cov-report=term-missing
+        run: pytest --cov=app/analytics --cov=app/nlp --cov-report=term-missing
