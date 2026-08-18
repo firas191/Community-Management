@@ -12,12 +12,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.api import (
+    routes_agent,
     routes_health,
     routes_ingestion,
     routes_kpi,
     routes_llm,
     routes_recommend,
     routes_sentiment,
+    routes_topics,
 )
 from app.config import settings
 from app.core.errors import register_error_handlers
@@ -50,6 +52,8 @@ def create_app() -> FastAPI:
     app.include_router(routes_sentiment.router)
     app.include_router(routes_recommend.router)
     app.include_router(routes_llm.router)
+    app.include_router(routes_agent.router)
+    app.include_router(routes_topics.router)
 
     log.info("app_started", version=__version__, cors_origins=settings.cors_origin_list)
     return app

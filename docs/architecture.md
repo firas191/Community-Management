@@ -51,15 +51,34 @@ Missing platform metrics are stored as NULL, never 0. Public YouTube hides reach
 and impressions, so reach-based KPIs will return null with a reason instead of a
 misleading zero.
 
-## Engines (later weeks)
+## Engines
 
-Three engines sit on top of the data. The analytics package holds pure Pandas
-functions for KPIs, temporal rollups, best-time analysis, hashtags, forecasting,
-and anomaly detection (Weeks 2 and 5). The NLP package handles language routing,
-multilingual sentiment, a fine-tuned Tunisian Arabizi model, and BERTopic
-subjects (Weeks 3 and 4). The LLM package is a LiteLLM multi-provider gateway
-with failover, caching, and full call logging (Week 6). A LangGraph analyst
-agent wraps the tested analytics functions as read-only tools (Week 7).
+Four engines sit on top of the data.
+
+**analytics** holds the pure KPI formulas and temporal rollups (Week 2) and the
+recommendation engine for best time, content type and hashtags, ranked with
+shrinkage and reported with evidence (Week 5). The layering is strict: `kpi.py`
+and `recommend.py` are pure functions, `aggregation.py` is pure pandas, and only
+`service.py` and `recommend_service.py` touch the database.
+
+**nlp** handles preprocessing, language routing with the Tunisian Arabizi rule
+layer, multilingual sentiment behind an injectable backend (Week 3), the
+fine-tuned Arabizi model routed to for `aeb-latn` text (Week 4), and topic
+clustering with the same injectable-backend pattern (Week 8).
+
+**llm** is a LiteLLM multi-provider gateway with failover across the free tiers,
+response caching, and one `llm_calls` row per attempt including the provider's
+error message (Week 6).
+
+**agent** is a LangGraph think/act loop whose tools are the tested analytics
+functions above, read-only and bounded, with the full tool trace persisted to
+`agent_runs` (Week 7).
+
+Heavy or conflicting dependencies are isolated as optional extras rather than
+forced into the image: `nlp` and `llm` and `agent` are installed, while `train`
+(fine-tuning) and `topics` (BERTopic, which caps numpy below the analytics pin)
+are not. Every module behind a missing extra answers 503 with an install hint
+instead of failing obscurely, so the stack always boots.
 
 ## Configuration
 

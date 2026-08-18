@@ -73,6 +73,35 @@ curl -H "X-API-Key: change-me" -X POST localhost:8000/llm/generate \
   -d '{"brief":"weekend promo on grilled sandwiches","account_id":1,"n":3}'
 ```
 
+**Week 7 — analyst agent.** Ask a question in plain language ("how did engagement
+do last month?", "when should we post?") and get an answer built from real numbers.
+The agent can't invent figures: its tools are the same KPI, sentiment and
+recommendation functions the API already exposes, all read-only, so anything it
+quotes is reproducible. It's a LangGraph loop with a budget of six tool calls, and
+every run is saved to `agent_runs` with the full trace of which tools ran, with
+what arguments, and what they returned — so you can check any answer afterwards.
+
+```bash
+curl -H "X-API-Key: change-me" -X POST localhost:8000/agent/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question":"When should we post, and what worked best?","account_id":1}'
+```
+
+**Week 8 — topics, retention, close-out.** Comment clustering to see *what*
+people are talking about, not just how they feel: each topic is stored with its
+keywords, size and average sentiment, and comments are linked to their topic so
+sentiment-by-subject is a single join. Below 20 comments it declines to guess.
+BERTopic sits in an optional `topics` extra rather than the image — it needs numba,
+which caps numpy below the version the KPI engine pins, and that trade wasn't worth
+making for a secondary feature — so `/topics` answers 503 with an install hint
+unless you install it. Also: the `raw_events` archive is now capped at 30 days by a
+daily purge job that reports what it deleted.
+
+```bash
+curl -H "X-API-Key: change-me" -X POST \
+  "localhost:8000/topics/run?account_id=1&window=90d"
+```
+
 ## Running it
 
 ```bash

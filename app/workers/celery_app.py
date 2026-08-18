@@ -20,7 +20,11 @@ celery_app = Celery(
     "community_management",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["app.workers.tasks_analyze", "app.workers.tasks_ingest"],
+    include=[
+        "app.workers.tasks_analyze",
+        "app.workers.tasks_ingest",
+        "app.workers.tasks_maintenance",
+    ],
 )
 celery_app.conf.update(
     task_serializer="json",
@@ -48,6 +52,11 @@ celery_app.conf.beat_schedule = {
     "analyze-new-comments-every-30-min": {
         "task": "app.workers.tasks_analyze.analyze_new_comments_task",
         "schedule": 1800.0,
+    },
+    # Raw payload archive is capped at 30 days (brief Section 7.1). Daily purge.
+    "purge-raw-events-daily": {
+        "task": "app.workers.tasks_maintenance.purge_raw_events_task",
+        "schedule": 86400.0,
     },
 }
 

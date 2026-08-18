@@ -49,6 +49,15 @@ class Attempt:
 
 
 @dataclass(slots=True)
+class ToolCall:
+    """A tool the model asked to run. ``arguments`` is the raw JSON string it sent."""
+
+    id: str
+    name: str
+    arguments: str
+
+
+@dataclass(slots=True)
 class LLMResult:
     text: str
     provider: str
@@ -59,6 +68,7 @@ class LLMResult:
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
     attempts: list[Attempt] = field(default_factory=list)
+    tool_calls: list[ToolCall] = field(default_factory=list)
 
 
 def _default_completion_fn() -> CompletionFn:
@@ -74,23 +84,47 @@ def _default_completion_fn() -> CompletionFn:
     return litellm.completion
 
 
-def _extract(resp: object) -> tuple[str, int | None, int | None, str | None]:
-    """Pull text, token counts, and the resolved model from a litellm/OpenAI response."""
-    def get(obj: object, key: str) -> object:
-        if isinstance(obj, dict):
-            return obj.get(key)
-        return getattr(obj, key, None)
+def _get(obj: object, key: str) -> object:
+    if isinstance(obj, dict):
+        return obj.get(key)
+    return getattr(obj, key, None)
 
-    choices = get(resp, "choices") or []
+
+def _extract_tool_calls(message: object) -> list[ToolCall]:
+    """Tool calls off a response message, tolerating dict- and object-shaped replies."""
+    raw = _get(message, "tool_calls") or []
+    calls: list[ToolCall] = []
+    for i, tc in enumerate(raw):
+        fn = _get(tc, "function")
+        name = _get(fn, "name") if fn is not None else None
+        args = _get(fn, "arguments") if fn is not None else None
+        if not name:
+            continue
+        calls.append(ToolCall(id=str(_get(tc, "id") or f"call_{i}"), name=str(name), arguments=str(args or "{}")))
+    return calls
+
+
+def _extract(resp: object) -> tuple[str, int | None, int | None, str | None, list[ToolCall]]:
+    """Pull text, tokens, resolved model, and tool calls from a litellm/OpenAI response."""
+    choices = _get(resp, "choices") or []
     text = ""
+    tool_calls: list[ToolCall] = []
     if choices:
-        message = get(choices[0], "message")
-        text = (get(message, "content") or "") if message is not None else ""
-    usage = get(resp, "usage")
-    pt = get(usage, "prompt_tokens") if usage is not None else None
-    ct = get(usage, "completion_tokens") if usage is not None else None
-    model = get(resp, "model")
-    return str(text), (int(pt) if pt is not None else None), (int(ct) if ct is not None else None), (str(model) if model else None)
+        message = _get(choices[0], "message")
+        if message is not None:
+            text = _get(message, "content") or ""
+            tool_calls = _extract_tool_calls(message)
+    usage = _get(resp, "usage")
+    pt = _get(usage, "prompt_tokens") if usage is not None else None
+    ct = _get(usage, "completion_tokens") if usage is not None else None
+    model = _get(resp, "model")
+    return (
+        str(text),
+        (int(pt) if pt is not None else None),
+        (int(ct) if ct is not None else None),
+        (str(model) if model else None),
+        tool_calls,
+    )
 
 
 class LLMGateway:
@@ -128,13 +162,21 @@ class LLMGateway:
         max_tokens: int = 800,
         temperature: float = 0.7,
         use_cache: bool = True,
+        tools: list[dict] | None = None,
     ) -> LLMResult:
-        """Return the first successful completion in the chain, or raise LLMError."""
+        """Return the first successful completion in the chain, or raise LLMError.
+
+        When ``tools`` is given the model may answer with tool calls instead of text;
+        they arrive in ``LLMResult.tool_calls``. Tool-calling turns are never cached,
+        because the agent loop depends on each turn being decided fresh.
+        """
         if not self._chain:
             raise LLMError(
                 "No LLM providers configured. Set at least one provider key (e.g. GROQ_API_KEY)."
             )
 
+        if tools:
+            use_cache = False
         key = self._cache_key(messages, max_tokens, temperature)
         if use_cache:
             hit = self._cache_get(key)
@@ -149,6 +191,7 @@ class LLMGateway:
             api_base = self._settings.ollama_base_url if provider == "ollama" else None
             t0 = time.perf_counter()
             try:
+                extra = {"tools": tools, "tool_choice": "auto"} if tools else {}
                 resp = fn(
                     model=model,
                     messages=messages,
@@ -156,13 +199,15 @@ class LLMGateway:
                     api_base=api_base,
                     max_tokens=max_tokens,
                     temperature=temperature,
+                    **extra,
                 )
                 elapsed = int((time.perf_counter() - t0) * 1000)
-                text, pt, ct, resolved = _extract(resp)
+                text, pt, ct, resolved, tool_calls = _extract(resp)
                 attempts.append(Attempt(provider, model, "ok", elapsed, pt, ct))
                 result = LLMResult(
                     text=text, provider=provider, model=resolved or model, latency_ms=elapsed,
                     fallback_depth=depth, prompt_tokens=pt, completion_tokens=ct, attempts=attempts,
+                    tool_calls=tool_calls,
                 )
                 if use_cache:
                     self._cache_set(key, result)

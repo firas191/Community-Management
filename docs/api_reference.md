@@ -1,7 +1,6 @@
 # API Reference
 
-Live endpoints as of Week 2. The full contract for later weeks is in brief
-Section 12. OpenAPI docs are always current at `/docs`.
+Every live endpoint. OpenAPI docs are always current at `/docs`.
 
 Auth: send `X-API-Key` on every endpoint except `/health/live`. Errors return
 `application/problem+json` with fields type, title, status, detail.
@@ -30,8 +29,9 @@ per-dependency list.
 
 `GET /meta/models`
 
-Registry of model names and versions the system loads. Versions read "pending"
-or "not_trained" until the NLP and LLM weeks land.
+Registry of the model names and versions the system loads. The `arabizi_finetuned`
+entry reflects live config: when `ARABIZI_MODEL` is set it reports that path and
+`active: true`, otherwise `not_configured` (Arabizi then falls back to Model A).
 
 ## Ingestion
 
@@ -254,3 +254,129 @@ and deltas versus the previous window.
 Query `account_id` (required), `window` (default `14d`), `limit`. Recent negative
 comments plus per-day negative share, with days flagged where the share exceeds
 mean + 2 sigma over at least 10 comments.
+
+## Recommendations
+
+Each recommendation carries its evidence: `n` (sample size), `lift` (versus the
+account's own baseline engagement rate), and a `confidence` tier from the sample
+size (n>=8 high, n>=4 medium, n>=2 low, below that not surfaced). Ranking uses a
+shrinkage-adjusted score so a thin slot cannot win on one lucky post. Not enough
+data returns a `reason` (`insufficient_data`, `no_engagement_signal`,
+`no_hashtags`) rather than a guess. These are POST because each call stores a
+`recommendations` row for the audit trail.
+
+`POST /recommendations/best-time`
+
+Query: `account_id` (required), `window` (default `90d`), `top_k` (1..24),
+`include_synthetic`. Day-and-hour slots in Africa/Tunis, plus day-only and
+hour-only rankings, which are more robust when cells are sparse.
+
+```json
+{
+  "account_id": 1, "window": "90d", "kind": "best_time",
+  "engagement_rate_basis": "err", "baseline_er": 4.7076, "n_total": 37,
+  "timezone": "Africa/Tunis", "reason": null,
+  "top_cells": [{"day_of_week": 6, "day": "Sunday", "hour": 21, "n": 2,
+                 "mean_er": 5.665, "shrunk_score": 4.9811, "lift": 1.2,
+                 "confidence": "low"}],
+  "by_day": [{"day": "Friday", "n": 7, "lift": 1.12, "confidence": "medium"}],
+  "by_hour": [{"hour": 16, "n": 4, "lift": 1.22, "confidence": "medium"}]
+}
+```
+
+`POST /recommendations/content-types`
+
+Query: `account_id` (required), `window`, `include_synthetic`. Ranks video, photo,
+carousel and reel by shrunk engagement rate.
+
+`POST /recommendations/hashtags`
+
+Query: `account_id` (required), `window`, `top_k` (1..50), `include_synthetic`.
+Ranks hashtags by lift. Extraction is Unicode-aware, so Arabic tags count.
+
+`POST /recommendations/all`
+
+All three in one call, plus the account handle and platform.
+
+## LLM
+
+A multi-provider gateway over the free tiers (Groq, Gemini, OpenRouter, NVIDIA,
+local Ollama). A request walks the configured chain and returns the first success;
+every attempt writes an `llm_calls` row with tokens, latency, fallback depth, and
+the provider's error message when it failed. Returns 503 when no provider key is
+set or the `llm` extra is missing.
+
+`GET /llm/providers`
+
+Which providers have a key and the resulting failover chain. No secrets.
+
+```json
+{"configured": {"groq": true, "gemini": true, "openrouter": false, "nvidia": false},
+ "chain": ["groq/openai/gpt-oss-20b", "gemini/gemini-2.5-flash"], "ready": true}
+```
+
+`POST /llm/generate`
+
+Body: `brief` (required), `account_id?`, `n` (1..8), `language`, `tone`,
+`platform`. Generates caption options; with an `account_id` the account's recent
+posts are used as a brand-voice reference. Stored in `generated_contents`.
+
+```json
+{"account_id": 1, "brief": "weekend promo", "platform": "instagram",
+ "variants": ["...", "...", "..."], "provider": "groq",
+ "model": "groq/openai/gpt-oss-20b", "latency_ms": 696,
+ "fallback_depth": 0, "cached": false,
+ "prompt_tokens": 151, "completion_tokens": 79}
+```
+
+## Analyst agent
+
+Answers questions using the analytics functions above as read-only tools, capped
+at 6 tool calls per question. Every figure in an answer comes from a tool result,
+and the full trace is stored in `agent_runs`. Returns 503 without the `agent` or
+`llm` extras, or when no provider is configured.
+
+`POST /agent/ask`
+
+Body: `question` (required), `account_id?`, `conversation_id?`.
+
+```json
+{"account_id": 1, "conversation_id": "c568...", "question": "When should we post?",
+ "answer": "Over the last 120 days (n=37 posts), Friday performs best...",
+ "tool_call_count": 2,
+ "trace": [{"step": 1, "tool": "recommend_best_time",
+            "arguments": "{\"window\":\"120d\"}", "ok": true,
+            "result": "{...}", "truncated": true}],
+ "provider": "gemini", "model": "gemini-2.5-flash", "latency_ms": 3581}
+```
+
+`GET /agent/runs`
+
+Query: `account_id?`, `limit` (1..100). Recent runs with their traces, for the
+explainability view.
+
+## Topics
+
+Clusters an account's comments into subjects, each stored with keywords, size and
+average sentiment; clustered comments get `comment_analyses.topic_id` so
+sentiment-by-topic is a join. Below 20 comments in the window it returns
+`insufficient_data` rather than clustering noise. BERTopic is an optional extra
+that is not in the app image, so these return 503 with an install hint unless
+`pip install -e ".[topics]"` has been run.
+
+`POST /topics/run`
+
+Query: `account_id` (required), `window` (default `30d`), `min_topic_size`
+(2..50). Idempotent per account and window: a re-run replaces that window's rows.
+
+```json
+{"account_id": 1, "window": "90d", "n_comments": 210, "n_topics": 2,
+ "reason": null, "model_name": "bertopic-multilingual",
+ "topics": [{"topic_id": 0, "label": "livraison / retard",
+             "keywords": ["livraison", "retard"], "comment_count": 34,
+             "avg_sentiment": -0.41, "n_labeled": 30}]}
+```
+
+`GET /topics`
+
+Query: `account_id` (required), `limit` (1..200). Stored topics, largest first.

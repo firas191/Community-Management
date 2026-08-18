@@ -38,6 +38,9 @@ class LLMCall(Base):
     completion_tokens: Mapped[int | None] = mapped_column(Integer)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[str | None] = mapped_column(Text)
+    # Provider message when status='error' (retired model, rate limit, bad request),
+    # so a failover is diagnosable from SQL instead of container logs.
+    error: Mapped[str | None] = mapped_column(Text)
     fallback_depth: Mapped[int | None] = mapped_column(SmallInteger)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

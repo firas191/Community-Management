@@ -70,6 +70,23 @@ llm = [
     "openai>=1.55.3,<2",
 ]
 
+# Week 7 analyst agent. LangGraph orchestrates the think/act loop; the tools are
+# this project's own analytics functions, so no LangChain integrations are needed.
+agent = [
+    "langgraph>=0.2.60,<2",
+]
+
+# Week 8 topic modeling. NOT installed in the app image, and it cannot be
+# installed alongside the core pins: bertopic pulls umap-learn and hdbscan, which
+# need numba, which caps numpy below 2.1 while the analytics layer pins numpy
+# 2.2.1. Install it in a separate environment (a notebook, or a dedicated worker
+# image built with numpy relaxed) the same way the `train` extra runs on Colab.
+# Without it the /topics endpoints answer 503 with an install hint.
+topics = [
+    "bertopic>=0.16,<0.18",
+    "sentence-transformers>=3.0,<6",
+]
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"

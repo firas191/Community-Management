@@ -25,7 +25,7 @@ RUN apt-get update \
 COPY pyproject.toml README.md ./
 RUN pip install --upgrade pip \
     && pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu \
-    && pip install -e ".[dev,nlp,llm]"
+    && pip install -e ".[dev,nlp,llm,agent]"
 
 # Then the source.
 COPY . .

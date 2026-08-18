@@ -35,6 +35,7 @@ def log_calls(db: Session, result: LLMResult, purpose: str) -> None:
                 completion_tokens=att.completion_tokens,
                 latency_ms=att.latency_ms,
                 status=att.status,
+                error=(att.error[:500] if att.error else None),
                 fallback_depth=depth,
             )
         )
