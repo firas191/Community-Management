@@ -1,4 +1,4 @@
-.PHONY: up down build migrate seed test lint fmt shell logs
+.PHONY: up down build migrate seed test test-unit test-integration test-local lint fmt shell logs
 
 up:
 	docker compose up --build
@@ -21,9 +21,22 @@ seed:
 # run. The conftest safety guards refuse any target not named like a test db.
 TEST_DB_URL ?= postgresql+psycopg://community_management:community_management@db:5432/community_management_test
 
+# Everything, with coverage. This is the target CI mirrors.
 test:
 	-docker compose exec db psql -U community_management -d community_management -c "CREATE DATABASE community_management_test"
 	docker compose exec -e TEST_DATABASE_URL=$(TEST_DB_URL) api pytest --cov=app/analytics --cov=app/nlp --cov-report=term-missing
+
+# Fast feedback: pure functions only. Integration tests skip themselves without
+# TEST_DATABASE_URL, which is why a plain `pytest` run reports skips.
+test-unit:
+	docker compose exec api pytest -q
+
+# The skipped ones: creates the throwaway database if missing (the leading `-`
+# ignores "already exists") and points the suite at it. Nothing here can touch the
+# live database; the conftest refuses any target whose name lacks "test".
+test-integration:
+	-docker compose exec db psql -U community_management -d community_management -c "CREATE DATABASE community_management_test"
+	docker compose exec -e TEST_DATABASE_URL=$(TEST_DB_URL) api pytest -q
 
 # Run tests locally without Docker (needs deps installed: pip install -e ".[dev]").
 # Point TEST_DATABASE_URL at your own local test database first, e.g.:

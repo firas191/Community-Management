@@ -131,13 +131,30 @@ API docs are at http://localhost:8000/docs.
 ## Make targets
 
 ```bash
-make up       # docker compose up --build
-make down     # stop the stack
-make migrate  # alembic upgrade head (in the api container)
-make seed     # load synthetic demo data
-make test     # pytest
-make lint     # ruff check
-make fmt      # ruff format
+make up               # docker compose up --build
+make down             # stop the stack
+make migrate          # alembic upgrade head (in the api container)
+make seed             # load synthetic demo data
+make test             # everything, with coverage (what CI runs)
+make test-unit        # pure functions only, fast
+make test-integration # the database-backed tests, on a throwaway db
+make lint             # ruff check
+make fmt              # ruff format
+```
+
+### A note on skipped tests
+
+A plain `pytest` run reports a number of skips. That is deliberate, not missing
+coverage: the database-backed tests drop every table, so they refuse to run unless
+`TEST_DATABASE_URL` points at a database whose name contains "test". They never
+fall back to the live database. `make test-integration` creates that throwaway
+database and runs them; CI does the same, so nothing is skipped there.
+
+Without `make` (for example in PowerShell), the same two steps are:
+
+```powershell
+docker compose exec db psql -U community_management -d community_management -c "CREATE DATABASE community_management_test"
+docker compose exec -e TEST_DATABASE_URL=postgresql+psycopg://community_management:community_management@db:5432/community_management_test api pytest -q
 ```
 
 ## Layout
